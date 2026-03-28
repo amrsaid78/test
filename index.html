@@ -1,0 +1,102 @@
+<<div id="auth-section" style="border: 1px solid #ccc; padding: 10px; margin-bottom: 20px;">
+    <h3>تسجيل الدخول</h3>
+    <input type="email" id="userEmail" placeholder="الايميل">
+    <input type="password" id="userPass" placeholder="كلمة المرور">
+    <button onclick="handleSignUp()">إنشاء حساب</button>
+    <button onclick="handleLogin()">دخول</button>
+</div>
+
+<div id="main-app" style="display:none; border: 1px solid #4CAF50; padding: 10px;">
+    <h3>محفظتك السحابية</h3>
+    <input type="text" id="stockName" placeholder="اسم السهم">
+    <input type="number" id="quantity" placeholder="الكمية">
+    <input type="number" id="price" placeholder="السعر">
+    <button onclick="saveToCloud()">حفظ السهم في السحابة</button>
+    <button onclick="auth.signOut()">تسجيل خروج</button>
+
+    <hr>
+    <h4>أسهمك المسجلة:</h4>
+    <ul id="stocksList"></ul> 
+</div>
+
+<script type="module">
+    // 1. استيراد المكتبات (التعديل: أضفنا أدوات الـ Auth)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+
+    // 2. إعداداتك (زي ما هي مظبوطة)
+    const firebaseConfig = {
+        apiKey: "AIzaSyCcv6pKofo8iBGY3EbMiXlmlsrdUj6qYQ8",
+        authDomain: "test-d03ba.firebaseapp.com",
+        projectId: "test-d03ba",
+        storageBucket: "test-d03ba.firebasestorage.app",
+        messagingSenderId: "633459459744",
+        appId: "1:633459459744:web:139bd6e8818789799d2bc5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    window.auth = getAuth(app); // جعلناها window لتعمل مع الأزرار
+
+    // وظيفة إنشاء حساب
+    window.handleSignUp = async function() {
+        const email = document.getElementById('userEmail').value;
+        const pass = document.getElementById('userPass').value;
+        try {
+            await createUserWithEmailAndPassword(auth, email, pass);
+            alert("تم إنشاء الحساب بنجاح!");
+        } catch (e) { alert("خطأ في الإنشاء: " + e.message); }
+    };
+
+    // وظيفة دخول
+    window.handleLogin = async function() {
+        const email = document.getElementById('userEmail').value;
+        const pass = document.getElementById('userPass').value;
+        try {
+            await signInWithEmailAndPassword(auth, email, pass);
+        } catch (e) { alert("خطأ في الدخول: " + e.message); }
+    };
+
+    // مراقبة حالة المستخدم (دخول/خروج)
+    auth.onAuthStateChanged((user) => {
+        const authDiv = document.getElementById('auth-section');
+        const appDiv = document.getElementById('main-app');
+        if (user) {
+            authDiv.style.display = 'none';
+            appDiv.style.display = 'block';
+            loadUserPortfolio();
+        } else {
+            authDiv.style.display = 'block';
+            appDiv.style.display = 'none';
+        }
+    });
+
+    // وظيفة الحفظ (التعديل: ربط الخانات بالمتغيرات)
+    window.saveToCloud = async function() {
+        const user = auth.currentUser;
+        if (!user) { alert("يرجى تسجيل الدخول"); return; }
+
+        const name = document.getElementById('stockName').value;
+        const qty = document.getElementById('quantity').value;
+        const prc = document.getElementById('price').value;
+
+        try {
+            await addDoc(collection(db, "user_stocks"), {
+                uid: user.uid,
+                stock: name,
+                quantity: Number(qty),
+                price: Number(prc),
+                timestamp: new Date()
+            });
+            alert("تم حفظ السهم بنجاح! ✅");
+            loadUserPortfolio(); // تحديث القائمة فوراً
+        } catch (e) { console.error(e); }
+    };
+
+    // وظيفة جلب وعرض البيانات
+    async function loadUserPortfolio() {
+        const user = auth.currentUser;
+        if (!user) return;
+        const q = query(collection(db, "user_stocks"), where("uid", "==", user.uid));
+        const list = document.getElementById('stocksList
